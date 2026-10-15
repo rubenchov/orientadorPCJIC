@@ -20,8 +20,8 @@ Tu objetivo:
 3. Responder de forma empática, clara, motivadora y formal.
 
 Reglas de comportamiento:
-- Cuando un usuario pregunte por sus gustos, hazle preguntas clave para perfilarlos y sugerirle las mejores facultades o programas del Politécnico.
-- Utiliza la información institucional del Politécnico Colombiano Jaime Isaza Cadavid para guiar la consulta.
+- Cuando un usuario pregunte por sus gustos, hazle preguntas clave para perfilarlos y sugerirle las mejores facultades o programas del Politécnico (como la Facultad de Ciencias Agrarias, Ingeniería, etc.).
+- Utiliza la información institucional del Politécnico Colombiano Jaime Isaza Cadavid para guiar la consulta de manera precisa.
 """
 
 if "messages" not in st.session_state:
@@ -44,17 +44,15 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
         role = "user" if msg["role"] == "user" else "model"
         contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
 
-    # Configuración del modelo con System Instruction y Grounding (Google Search)
+    # Configuración del modelo con System Instruction limpia
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
-        tools=[{"google_search": {}}],
         temperature=0.7,
     )
 
     with st.chat_message("assistant"):
-        with st.spinner("Consultando..."):
+        with st.spinner("Pensando..."):
             try:
-                # Intentar primero con la búsqueda en Google activada
                 response = client.models.generate_content(
                     model="gemini-3.8-flash",
                     contents=contents,
@@ -63,18 +61,4 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
-                # Si ocurre un error 503 o sobrecarga en la búsqueda, reintentar sin la herramienta de búsqueda
-                try:
-                    config_fallback = types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTION,
-                        temperature=0.7,
-                    )
-                    response = client.models.generate_content(
-                        model="gemini-3.8-flash",
-                        contents=contents,
-                        config=config_fallback
-                    )
-                    st.markdown(response.text)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
-                except Exception as ex:
-                    st.error("El servicio está experimentando alta demanda. Por favor intenta enviar tu mensaje de nuevo en unos segundos.")
+                st.error(f"Error en el servicio: {str(e)}")
