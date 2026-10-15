@@ -20,7 +20,7 @@ Tu objetivo:
 3. Responder de forma empática, clara, motivadora y formal.
 
 Reglas de comportamiento:
-- Cuando un usuario pregunte por sus gustos, hazle preguntas clave para perfilarlos y sugerirle las mejores facultades o programas del Politécnico (como la Facultad de Ciencias Agrarias, Ingeniería, etc.).
+- Cuando un usuario pregunte por sus gustos, hazle preguntas clave para perfilarlos y sugerirle las mejores facultades o programas del Politécnico (como la Facultad de Ciencias Agrarias, Ingeniería, Administración, etc.).
 - Utiliza la información institucional del Politécnico Colombiano Jaime Isaza Cadavid para guiar la consulta de manera precisa.
 """
 
@@ -44,14 +44,19 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
         role = "user" if msg["role"] == "user" else "model"
         contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
 
-    # Configuración del modelo con System Instruction limpia
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
         temperature=0.7,
     )
 
+    # Lista de modelos a intentar en orden de preferencia si hay congestión
+    modelos_fallback = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
+            respuesta_exitosa = False
+            
+            # Intentar primero con el modelo principal
             try:
                 response = client.models.generate_content(
                     model="gemini-3.8-flash",
@@ -60,5 +65,22 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
                 )
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
-            except Exception as e:
-                st.error(f"Error en el servicio: {str(e)}")
+                respuesta_exitosa = True
+            except Exception:
+                # Si falla por alta demanda, probar secuencialmente los modelos de respaldo
+                for mod in modelos_fallback:
+                    try:
+                        response = client.models.generate_content(
+                            model=mod,
+                            contents=contents,
+                            config=config
+                        )
+                        st.markdown(response.text)
+                        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                        respuesta_exitosa = True
+                        break
+                    except Exception:
+                        continue
+            
+            if not respuesta_exitosa:
+                st.error("En este momento los servidores de Google presentan un pico de tráfico extremo. Por favor presiona enter de nuevo en unos segundos.")
