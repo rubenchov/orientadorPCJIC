@@ -4,7 +4,7 @@ from google import genai
 from google.genai import types
 
 st.set_page_config(page_title="Orientador Politécnico", page_icon="🎓")
-st.title("🎓 Orientador Vocacional - Politécnico Jaime Isaza Cadavid")
+st.title("🎓 Orientador Vocacional - Politécnico Colombiano Jaime Isaza Cadavid")
 st.write("Pregúntame sobre tus gustos e intereses y te orientaré sobre la oferta académica.")
 
 # Obtener la API Key
