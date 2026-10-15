@@ -1,10 +1,11 @@
 import os
+import time
 import streamlit as st
 from google import genai
 from google.genai import types
 
 st.set_page_config(page_title="Orientador Politécnico", page_icon="🎓")
-st.title("🎓 Orientador Vocacional - Politécnico Colombiano Jaime Isaza Cadavid")
+st.title("🎓 Politécnico Colombiano Jaime Isaza Cadavid")
 st.write("Pregúntame sobre tus gustos e intereses y te orientaré sobre la oferta académica.")
 
 # Obtener la API Key
@@ -49,38 +50,31 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
         temperature=0.7,
     )
 
-    # Lista de modelos a intentar en orden de preferencia si hay congestión
-    modelos_fallback = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+    # Lista priorizada de modelos estables
+    modelos_a_probar = ["gemini-2.5-flash", "gemini-1.5-flash"]
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
-            respuesta_exitosa = False
+            exito = False
             
-            # Intentar primero con el modelo principal
-            try:
-                response = client.models.generate_content(
-                    model="gemini-3.8-flash",
-                    contents=contents,
-                    config=config
-                )
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
-                respuesta_exitosa = True
-            except Exception:
-                # Si falla por alta demanda, probar secuencialmente los modelos de respaldo
-                for mod in modelos_fallback:
+            for modelo in modelos_a_probar:
+                # Intentar hasta 3 veces por cada modelo con pequeñas pausas (backoff)
+                for intento in range(3):
                     try:
                         response = client.models.generate_content(
-                            model=mod,
+                            model=modelo,
                             contents=contents,
                             config=config
                         )
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
-                        respuesta_exitosa = True
+                        exito = True
                         break
                     except Exception:
-                        continue
+                        time.sleep(1.5)  # Espera breve antes de reintentar
+                
+                if exito:
+                    break
             
-            if not respuesta_exitosa:
-                st.error("En este momento los servidores de Google presentan un pico de tráfico extremo. Por favor presiona enter de nuevo en unos segundos.")
+            if not exito:
+                st.error("El servicio está recibiendo muchas consultas simultáneas. Por favor intenta enviar tu mensaje nuevamente en unos segundos.")
