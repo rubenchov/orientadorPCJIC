@@ -7,7 +7,7 @@ st.set_page_config(page_title="Orientador Politécnico", page_icon="🎓")
 st.title("🎓 Orientador Vocacional - Politécnico Jaime Isaza Cadavid")
 st.write("Pregúntame sobre tus gustos e intereses y te orientaré sobre la oferta académica.")
 
-# Obtener la API Key guardada en la plataforma
+# Obtener la API Key
 api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 client = genai.Client(api_key=api_key)
 
@@ -21,7 +21,7 @@ Tu objetivo:
 
 Reglas de comportamiento:
 - Cuando un usuario pregunte por sus gustos, hazle preguntas clave para perfilarlos y sugerirle las mejores facultades o programas del Politécnico.
-- Utiliza la búsqueda web integrada para consultar información real de politecnicojic.edu.co.
+- Utiliza la información institucional del Politécnico Colombiano Jaime Isaza Cadavid para guiar la consulta.
 """
 
 if "messages" not in st.session_state:
@@ -44,7 +44,7 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
         role = "user" if msg["role"] == "user" else "model"
         contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
 
-    # Configuración del modelo con System Instruction y Grounding
+    # Configuración del modelo con System Instruction y Grounding (Google Search)
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
         tools=[{"google_search": {}}],
@@ -52,8 +52,9 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
     )
 
     with st.chat_message("assistant"):
-        with st.spinner("Consultando información..."):
+        with st.spinner("Consultando..."):
             try:
+                # Intentar primero con la búsqueda en Google activada
                 response = client.models.generate_content(
                     model="gemini-3.8-flash",
                     contents=contents,
@@ -62,4 +63,18 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
-                st.error(f"Ocurrió un error: {str(e)}")
+                # Si ocurre un error 503 o sobrecarga en la búsqueda, reintentar sin la herramienta de búsqueda
+                try:
+                    config_fallback = types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=0.7,
+                    )
+                    response = client.models.generate_content(
+                        model="gemini-3.8-flash",
+                        contents=contents,
+                        config=config_fallback
+                    )
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                except Exception as ex:
+                    st.error("El servicio está experimentando alta demanda. Por favor intenta enviar tu mensaje de nuevo en unos segundos.")
