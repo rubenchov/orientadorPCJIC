@@ -39,7 +39,7 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Formatear el historial de chat de forma limpia para el SDK
+    # Formatear el historial de chat para el SDK
     contents = []
     for msg in st.session_state.messages:
         role = "user" if msg["role"] == "user" else "model"
@@ -55,32 +55,27 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
         temperature=0.7,
     )
 
-    # Lista con las denominaciones oficiales de los modelos rápidos en google-genai
-    modelos = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             exito = False
-            ultimo_error = ""
+            error_msg = ""
 
-            for mod in modelos:
-                for intento in range(2):
-                    try:
-                        response = client.models.generate_content(
-                            model=mod,
-                            contents=contents,
-                            config=config
-                        )
-                        if response.text:
-                            st.markdown(response.text)
-                            st.session_state.messages.append({"role": "assistant", "content": response.text})
-                            exito = True
-                            break
-                    except Exception as err:
-                        ultimo_error = str(err)
-                        time.sleep(1) # Pequeña pausa antes del reintento
-                if exito:
-                    break
+            # Reintentar hasta 3 veces únicamente con gemini-3.8-flash si el servidor está saturado
+            for intento in range(3):
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-3.8-flash",
+                        contents=contents,
+                        config=config
+                    )
+                    if response.text:
+                        st.markdown(response.text)
+                        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                        exito = True
+                        break
+                except Exception as err:
+                    error_msg = str(err)
+                    time.sleep(2)  # Pausa de 2 segundos antes de reintentar
 
             if not exito:
-                st.error(f"Error de conexión con Gemini: {ultimo_error}")
+                st.error(f"Error al conectar con Gemini 3.8 Flash: {error_msg}")
