@@ -55,8 +55,8 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
         temperature=0.7,
     )
 
-    # Modelos estables de la serie 2.5 con alto rendimiento y cuota amplia
-    modelos_disponibles = ["gemini-2.5-flash", "gemini-2.5-pro"]
+    # Usamos los modelos vigentes indicados por la propia API
+    modelos_disponibles = ["gemini-3.1-pro-preview", "gemini-3.8-flash"]
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
@@ -85,8 +85,8 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
 
             if not exito:
                 if "429" in ultimo_error or "RESOURCE_EXHAUSTED" in ultimo_error:
-                    st.warning("⚠️ Se alcanzó el límite de solicitudes por minuto. Aguarda 10 segundos y vuelve a enviar el mensaje.")
+                    st.warning("⚠️ Se alcanzó el límite de solicitudes de la cuota. Espera unos momentos o prueba con una clave de API nueva.")
                 elif "503" in ultimo_error or "UNAVAILABLE" in ultimo_error:
-                    st.warning("⚠️ El servidor de Google está experimentando alta demanda. Intenta de nuevo en unos momentos.")
+                    st.warning("⚠️ El servidor de Google está experimentando alta demanda. Intenta de nuevo en unos segundos.")
                 else:
                     st.error(f"Ocurrió un error al procesar la respuesta: {ultimo_error}")
