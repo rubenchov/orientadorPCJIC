@@ -8,7 +8,7 @@ st.set_page_config(page_title="Orientador Politécnico", page_icon="🎓")
 st.title("🎓 Orientador Vocacional - Politécnico Colombiano Jaime Isaza Cadavid")
 st.write("Pregúntame sobre tus gustos e intereses y te orientaré sobre la oferta académica.")
 
-# Obtener la API Key
+# Obtener la API Key desde los Secrets de Streamlit
 api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 client = genai.Client(api_key=api_key)
 
@@ -39,7 +39,7 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Formatear el historial de chat para el SDK
+    # Formatear el historial para la API
     contents = []
     for msg in st.session_state.messages:
         role = "user" if msg["role"] == "user" else "model"
@@ -55,27 +55,38 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
         temperature=0.7,
     )
 
+    # Modelos estables de la serie 2.5 con alto rendimiento y cuota amplia
+    modelos_disponibles = ["gemini-2.5-flash", "gemini-2.5-pro"]
+
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             exito = False
-            error_msg = ""
+            ultimo_error = ""
 
-            # Reintentar hasta 3 veces únicamente con gemini-3.8-flash si el servidor está saturado
-            for intento in range(3):
-                try:
-                    response = client.models.generate_content(
-                        model="gemini-3.8-flash",
-                        contents=contents,
-                        config=config
-                    )
-                    if response.text:
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "content": response.text})
-                        exito = True
-                        break
-                except Exception as err:
-                    error_msg = str(err)
-                    time.sleep(2)  # Pausa de 2 segundos antes de reintentar
+            for modelo in modelos_disponibles:
+                for intento in range(2):
+                    try:
+                        response = client.models.generate_content(
+                            model=modelo,
+                            contents=contents,
+                            config=config
+                        )
+                        if response.text:
+                            st.markdown(response.text)
+                            st.session_state.messages.append({"role": "assistant", "content": response.text})
+                            exito = True
+                            break
+                    except Exception as err:
+                        ultimo_error = str(err)
+                        time.sleep(1.5)
+                
+                if exito:
+                    break
 
             if not exito:
-                st.error(f"Error al conectar con Gemini 3.8 Flash: {error_msg}")
+                if "429" in ultimo_error or "RESOURCE_EXHAUSTED" in ultimo_error:
+                    st.warning("⚠️ Se alcanzó el límite de solicitudes por minuto. Aguarda 10 segundos y vuelve a enviar el mensaje.")
+                elif "503" in ultimo_error or "UNAVAILABLE" in ultimo_error:
+                    st.warning("⚠️ El servidor de Google está experimentando alta demanda. Intenta de nuevo en unos momentos.")
+                else:
+                    st.error(f"Ocurrió un error al procesar la respuesta: {ultimo_error}")
