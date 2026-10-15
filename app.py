@@ -5,7 +5,7 @@ from google import genai
 from google.genai import types
 
 st.set_page_config(page_title="Orientador Politécnico", page_icon="🎓")
-st.title("🎓 Orientador vocacional - Politécnico Colombiano Jaime Isaza Cadavid")
+st.title("🎓 Orientador Vocacional - Politécnico Colombiano Jaime Isaza Cadavid")
 st.write("Pregúntame sobre tus gustos e intereses y te orientaré sobre la oferta académica.")
 
 # Obtener la API Key
@@ -39,42 +39,48 @@ if prompt := st.chat_input("Escribe tu consulta o tus gustos aquí..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Formatear el historial para la API
+    # Formatear el historial de chat de forma limpia para el SDK
     contents = []
     for msg in st.session_state.messages:
         role = "user" if msg["role"] == "user" else "model"
-        contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+        contents.append(
+            types.Content(
+                role=role, 
+                parts=[types.Part.from_text(text=msg["content"])]
+            )
+        )
 
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
         temperature=0.7,
     )
 
-    # Lista priorizada de modelos estables
-    modelos_a_probar = ["gemini-2.5-flash", "gemini-1.5-flash"]
+    # Lista con las denominaciones oficiales de los modelos rápidos en google-genai
+    modelos = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             exito = False
-            
-            for modelo in modelos_a_probar:
-                # Intentar hasta 3 veces por cada modelo con pequeñas pausas (backoff)
-                for intento in range(3):
+            ultimo_error = ""
+
+            for mod in modelos:
+                for intento in range(2):
                     try:
                         response = client.models.generate_content(
-                            model=modelo,
+                            model=mod,
                             contents=contents,
                             config=config
                         )
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "content": response.text})
-                        exito = True
-                        break
-                    except Exception:
-                        time.sleep(1.5)  # Espera breve antes de reintentar
-                
+                        if response.text:
+                            st.markdown(response.text)
+                            st.session_state.messages.append({"role": "assistant", "content": response.text})
+                            exito = True
+                            break
+                    except Exception as err:
+                        ultimo_error = str(err)
+                        time.sleep(1) # Pequeña pausa antes del reintento
                 if exito:
                     break
-            
+
             if not exito:
-                st.error("El servicio está recibiendo muchas consultas simultáneas. Por favor intenta enviar tu mensaje nuevamente en unos segundos.")
+                st.error(f"Error de conexión con Gemini: {ultimo_error}")
